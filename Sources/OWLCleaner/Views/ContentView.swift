@@ -14,6 +14,17 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 560, ideal: 720)
         }
         .navigationTitle("")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await model.scan() }
+                } label: {
+                    Label(model.hasResults ? "Rescan" : "Scan", systemImage: "arrow.clockwise")
+                }
+                .disabled(model.phase == .scanning || model.phase == .cleaning)
+                .help("Scan all locations again")
+            }
+        }
     }
 }
 

@@ -12,6 +12,15 @@ struct SettingsView: View {
                 Text("When on, OWLCleaner reports what it *would* remove but changes nothing.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Large & Old Files") {
+                Picker("Only show files larger than", selection: $model.largeOldMinBytes) {
+                    Text("50 MB").tag(Int64(50 * 1024 * 1024))
+                    Text("100 MB").tag(Int64(100 * 1024 * 1024))
+                    Text("250 MB").tag(Int64(250 * 1024 * 1024))
+                    Text("500 MB").tag(Int64(500 * 1024 * 1024))
+                    Text("1 GB").tag(Int64(1024 * 1024 * 1024))
+                }
+            }
             Section("Permissions") {
                 Button("Open Full Disk Access settings…") { openFullDiskAccess() }
                 Text("Grant OWLCleaner Full Disk Access so it can reach system and app caches.")
