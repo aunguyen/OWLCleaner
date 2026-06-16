@@ -25,17 +25,18 @@ final class AppModel {
     var dryRun = false
     var selectedSidebar: SidebarItem = .smart
 
-    let modules: [any CleanupModule]
+    /// Large & Old finder settings; the module is rebuilt from these.
+    var largeOldFolder: URL?
+    var largeOldMinBytes: Int64 = 100 * 1024 * 1024
 
-    init(modules: [any CleanupModule] = AppModel.defaultModules()) {
-        self.modules = modules
+    private let baseModules: [any CleanupModule]
+
+    init(baseModules: [any CleanupModule] = [SystemJunkModule(), TrashModule(), DeveloperModule()]) {
+        self.baseModules = baseModules
     }
 
-    static func defaultModules() -> [any CleanupModule] {
-        // Trash / Developer / Large & Old are added in later tasks.
-        [
-            SystemJunkModule(),
-        ]
+    var modules: [any CleanupModule] {
+        baseModules + [LargeOldFilesModule(searchRoot: largeOldFolder, minBytes: largeOldMinBytes)]
     }
 
     // MARK: - Derived state
@@ -108,19 +109,50 @@ final class AppModel {
         phase = .results
     }
 
-    func clean() async {
-        guard !selectedItems.isEmpty else { return }
+    /// Re-scan a single module (used after the user picks a Large & Old folder).
+    func scanModule(_ id: String) async {
+        guard let module = module(id: id) else { return }
+        let result = await module.scan { _ in }
+        var updated = results.filter { $0.moduleID != id }
+        updated.append(result)
+        let order = Dictionary(uniqueKeysWithValues: modules.enumerated().map { ($1.id, $0) })
+        results = updated.sorted { (order[$0.moduleID] ?? 0) < (order[$1.moduleID] ?? 0) }
+        for item in result.items where item.defaultSelected { selection.insert(item.id) }
+        if phase == .idle || phase == .finished { phase = .results }
+    }
+
+    /// Set the Large & Old search folder and scan it.
+    func chooseLargeOldFolder(_ url: URL) async {
+        largeOldFolder = url
+        await scanModule("largeold")
+    }
+
+    func clean(filterModuleID: String? = nil) async {
+        let selected = selectedItems.filter { filterModuleID == nil || $0.moduleID == filterModuleID }
+        guard !selected.isEmpty else { return }
         phase = .cleaning
 
-        let items = selectedItems
         let dry = dryRun
-        let cleaner = Cleaner(safetyGuard: SafetyGuard(safeRoots: modules.flatMap(\.safeRoots)))
+        let mods = modules
 
-        let outcome = await Task.detached { cleaner.clean(items, dryRun: dry) }.value
+        // Clean each module's items with that module's own guard: cache modules
+        // keep the default denylist; Large & Old trashes user files in its folder.
+        let outcome = await Task.detached { () -> CleanOutcome in
+            var accumulated = CleanOutcome()
+            for module in mods {
+                let group = selected.filter { $0.moduleID == module.id }
+                guard !group.isEmpty else { continue }
+                let result = Cleaner(safetyGuard: module.cleaningGuard()).clean(group, dryRun: dry)
+                accumulated.removed += result.removed
+                accumulated.freedBytes += result.freedBytes
+                accumulated.failures += result.failures
+            }
+            return accumulated
+        }.value
 
         lastOutcome = outcome
         if !dry {
-            // Drop cleaned items from the displayed results.
+            // Drop cleaned items from the displayed results and selection.
             let removed = Set(outcome.removed.map(\.path))
             results = results.map { result in
                 ModuleScanResult(
@@ -129,7 +161,7 @@ final class AppModel {
                     skipped: result.skipped
                 )
             }
-            selection = []
+            selection = selection.filter { !removed.contains($0) }  // item ids are paths
         }
         phase = .finished
     }

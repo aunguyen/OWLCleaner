@@ -129,8 +129,15 @@ public protocol CleanupModule: Sendable {
     var title: String { get }
     var systemImage: String { get }
     var categories: [CleanupCategory] { get }
-    /// The directories this module is allowed to clean within. The app builds a
-    /// combined SafetyGuard from every active module's roots before cleaning.
+    /// The directories this module is allowed to clean within.
     var safeRoots: [URL] { get }
+    /// The guard used when cleaning this module's items. Cache modules use the
+    /// default denylist (defense in depth); the Large & Old finder overrides this
+    /// to operate on user files (recoverably, via Trash) within the chosen folder.
+    func cleaningGuard() -> SafetyGuard
     func scan(progress: @Sendable @escaping (Double) -> Void) async -> ModuleScanResult
+}
+
+public extension CleanupModule {
+    func cleaningGuard() -> SafetyGuard { SafetyGuard(safeRoots: safeRoots) }
 }

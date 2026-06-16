@@ -12,13 +12,17 @@ struct DetailView: View {
             )
             .ignoresSafeArea()
 
-            switch model.phase {
-            case .idle:
-                IdleHero()
-            case .scanning:
-                ScanningView()
-            case .results, .cleaning, .finished:
-                ResultsView()
+            if case .module("largeold") = model.selectedSidebar {
+                LargeOldFilesView()
+            } else {
+                switch model.phase {
+                case .idle:
+                    IdleHero()
+                case .scanning:
+                    ScanningView()
+                case .results, .cleaning, .finished:
+                    ResultsView()
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
