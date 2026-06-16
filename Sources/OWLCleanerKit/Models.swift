@@ -129,5 +129,8 @@ public protocol CleanupModule: Sendable {
     var title: String { get }
     var systemImage: String { get }
     var categories: [CleanupCategory] { get }
+    /// The directories this module is allowed to clean within. The app builds a
+    /// combined SafetyGuard from every active module's roots before cleaning.
+    var safeRoots: [URL] { get }
     func scan(progress: @Sendable @escaping (Double) -> Void) async -> ModuleScanResult
 }
