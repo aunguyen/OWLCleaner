@@ -55,13 +55,17 @@ public struct DirectoryJunkScanner: Sendable {
                     }
                     let size = sizer.allocatedSize(of: url)
                     guard size > 0 else { continue }  // skip empty entries — only noise
+                    // Regenerable-but-costly items are offered as opt-in (deselected
+                    // + note); ordinary junk keeps the module's default selection.
+                    let caution = CautionRules.note(forItemAt: url, categoryID: root.categoryID)
                     items.append(CleanupItem(
                         url: url,
                         sizeBytes: size,
                         categoryID: root.categoryID,
                         moduleID: moduleID,
                         removalMode: removalMode,
-                        defaultSelected: defaultSelected
+                        defaultSelected: defaultSelected && caution == nil,
+                        note: caution
                     ))
                 case let .rejected(rejection):
                     let reason: SkipReason = rejection == .denylisted ? .needsElevatedAccess : .outsideSafeRoot

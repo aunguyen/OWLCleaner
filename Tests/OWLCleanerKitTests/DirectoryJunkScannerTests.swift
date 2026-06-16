@@ -67,6 +67,29 @@ struct DirectoryJunkScannerTests {
         #expect(byCategory["logs"]?.count == 1)
     }
 
+    @Test("regenerable-but-costly items are offered but NOT auto-selected, with a note")
+    func cautionItemsAreOptIn() async {
+        let box = TempSandbox()
+        let caches = box.makeDir("Caches")
+        box.makeFile("Caches/ms-playwright/chromium-1217/x", bytes: 5000)
+        box.makeFile("Caches/org.swift.swiftpm/repositories/x", bytes: 5000)
+
+        let scanner = DirectoryJunkScanner(
+            moduleID: "system",
+            roots: [.init(url: caches, categoryID: "system.caches")],
+            removalMode: .delete,
+            defaultSelected: true
+        )
+        let result = await scanner.scan { _ in }
+
+        let playwright = result.items.first { $0.displayName == "ms-playwright" }
+        let swiftpm = result.items.first { $0.displayName == "org.swift.swiftpm" }
+        #expect(playwright?.defaultSelected == false)
+        #expect(playwright?.note != nil)
+        #expect(swiftpm?.defaultSelected == true)
+        #expect(swiftpm?.note == nil)
+    }
+
     @Test("an item we cannot delete is surfaced as needing elevated access, not offered")
     func nonDeletableSkipped() async {
         let box = TempSandbox()

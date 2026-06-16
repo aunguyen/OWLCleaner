@@ -49,10 +49,25 @@ private func runSelfTestAndExit() -> Never {
         print("SELFTEST TIMEOUT"); exit(2)
     }
 
+    let verbose = ProcessInfo.processInfo.environment["OWL_SELFTEST"] == "list"
+
     Task { @MainActor in
         let model = AppModel()
         await model.scan()
         print("  scan: \(ByteFormat.string(model.totalFoundBytes)) across \(model.allItems.count) items, \(model.modules.count) modules")
+
+        if verbose {
+            for result in model.results {
+                let module = model.module(id: result.moduleID)
+                print("\n### \(module?.title ?? result.moduleID) — \(ByteFormat.string(result.totalBytes)), \(result.items.count) items, \(result.skipped.count) skipped")
+                for item in result.items.sorted(by: { $0.sizeBytes > $1.sizeBytes }).prefix(20) {
+                    let tag = item.defaultSelected ? "[auto]   " : "[opt-in] "
+                    let note = item.note.map { "  — \($0)" } ?? ""
+                    print(String(format: "  %@%10@  %@%@", tag, ByteFormat.string(item.sizeBytes) as NSString, item.url.lastPathComponent, note))
+                }
+            }
+            exit(0)
+        }
 
         model.dryRun = true
         await model.clean()
