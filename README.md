@@ -62,12 +62,26 @@ swift test
 ./Scripts/make_app.sh
 ```
 
-The app is signed with a stable Apple Development identity so the **Full Disk
-Access** grant survives rebuilds. Override the identity if needed:
+By default the bundle is **ad-hoc signed**. For development, set a stable signing
+identity so the **Full Disk Access** grant survives rebuilds (an ad-hoc signature
+changes every build, dropping the grant):
 
 ```sh
-OWL_SIGN_ID="<identity hash or name>" ./Scripts/make_app.sh
+OWL_SIGN_ID="<Apple Development identity hash or name>" ./Scripts/make_app.sh
+# list identities: security find-identity -v -p codesigning
 ```
+
+### Installing the release build
+
+The `.app` attached to GitHub Releases is **not notarized**, so Gatekeeper will warn
+on first launch. Either right-click the app → **Open** → **Open**, or clear the
+quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/OWLCleaner.app
+```
+
+Building from source (above) avoids this entirely.
 
 ### Grant Full Disk Access (one-time)
 

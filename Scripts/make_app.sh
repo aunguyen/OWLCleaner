@@ -16,10 +16,10 @@ APP_DIR="$ROOT/build/${APP_NAME}.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RES_DIR="$APP_DIR/Contents/Resources"
 
-# Default to a stable Apple Development identity (overridable). Falls back to
-# ad-hoc signing if the identity is unavailable.
-DEFAULT_SIGN_ID=""
-SIGN_ID="${OWL_SIGN_ID:-$DEFAULT_SIGN_ID}"
+# Optional stable signing identity (overridable). When set, the bundle's
+# designated requirement stays constant across rebuilds so a Full Disk Access
+# grant persists. Unset -> ad-hoc signature (fine for local/dev use).
+SIGN_ID="${OWL_SIGN_ID:-}"
 
 echo "==> Building ($CONFIG)…"
 swift build -c "$CONFIG"
@@ -58,13 +58,18 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "==> Code signing (identity: $SIGN_ID)…"
-if codesign --force --deep --sign "$SIGN_ID" "$APP_DIR" 2>/dev/null; then
-  echo "    signed with stable identity (FDA grant will persist across rebuilds)"
+echo "==> Code signing…"
+if [[ -n "$SIGN_ID" ]]; then
+  if codesign --force --deep --sign "$SIGN_ID" "$APP_DIR" 2>/dev/null; then
+    echo "    signed with '$SIGN_ID' (stable designated requirement → Full Disk Access persists across rebuilds)"
+  else
+    echo "    WARNING: identity '$SIGN_ID' unavailable; falling back to ad-hoc."
+    codesign --force --deep --sign - "$APP_DIR"
+  fi
 else
-  echo "    WARNING: identity '$SIGN_ID' unavailable; falling back to ad-hoc."
-  echo "    Ad-hoc signatures change every build, so Full Disk Access must be re-granted each rebuild."
   codesign --force --deep --sign - "$APP_DIR"
+  echo "    ad-hoc signed. Set OWL_SIGN_ID=<identity> for a stable signature so the"
+  echo "    Full Disk Access grant survives rebuilds (see README)."
 fi
 
 echo "==> Done: $APP_DIR"
